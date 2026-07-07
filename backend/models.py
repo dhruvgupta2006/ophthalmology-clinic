@@ -31,6 +31,49 @@ class Patient(Base):
     contact = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class Symptom(Base):
+    __tablename__ = "symptoms"
+    id = Column(Integer, primary_key=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    description = Column(String, nullable=False)
+    severity = Column(String, nullable=False)  # 'low', 'moderate', 'severe'
+
+class Sign(Base):
+    __tablename__ = "signs"
+    id = Column(Integer, primary_key=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    description = Column(String, nullable=False)
+    severity = Column(String, nullable=False)  # 'low', 'moderate', 'severe'
+
+class Visit(Base):
+    __tablename__ = "visits"
+    id = Column(Integer, primary_key=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    date = Column(DateTime, nullable=False)
+    notes = Column(String)
+
+class VisionTest(Base):
+    __tablename__ = "vision_tests"
+    id = Column(Integer, primary_key=True)
+    visit_id = Column(Integer, ForeignKey("visits.id"), nullable=False)
+    eye = Column(String, nullable=False)  # 'OD', 'OS', 'OU'
+    acuity = Column(String)
+    notes = Column(String)
+
+class PentacamTest(Base):
+    __tablename__ = "pentacam_tests"
+    id = Column(Integer, primary_key=True)
+    visit_id = Column(Integer, ForeignKey("visits.id"), nullable=False)
+    date = Column(DateTime, nullable=False)
+    eye = Column(String, nullable=False)  # 'OD', 'OS', 'OU'
+
+class PentacamValues(Base):
+    __tablename__ = "pentacam_values"
+    id = Column(Integer, primary_key=True)
+    pentacam_test_id = Column(Integer, ForeignKey("pentacam_tests.id"), nullable=False)
+    key = Column(String, nullable=False)  # e.g., 'K1', 'K2', 'Kmax', 'pachymetry'
+    value = Column(String, nullable=False)
+
 def get_db():
     db = SessionLocal()
     try:
