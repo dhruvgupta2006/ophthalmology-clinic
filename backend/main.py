@@ -14,10 +14,12 @@ from typing import Optional,List
 from datetime import datetime
 
 # Import User and Patient table models, and get_db session dependency
-from models import User, Patient, get_db
+from models import User, Patient, get_db,Symptom,Sign 
 
 # Import password hashing, verification, JWT token creation, and auth dependency
 from auth import hash_password, verify_password, create_access_token, get_current_user, oauth2_scheme
+
+from enum import Enum 
 # Create the FastAPI app instance — this is the main app object
 app = FastAPI()
 
@@ -68,6 +70,53 @@ class PatientUpdate(BaseModel):
     age: Optional[int] = None
     gender: Optional[str] = None
     contact: Optional[str] = None
+
+class Severity(str, Enum):
+    none = "none"
+    low = "low"
+    moderate = "moderate"
+    severe = "severe"
+
+class SymptomCreate(BaseModel):
+    description: str
+    severity: Severity
+
+    
+class SignCreate(BaseModel):
+    description: str
+    severity: Severity
+
+   
+
+class SymptomResponse(BaseModel):
+    id: int
+    patient_id: int
+    description: str
+    severity: Severity
+
+    model_config = ConfigDict(from_attributes=True)
+
+  
+
+class SignResponse(BaseModel):
+    id: int
+    patient_id: int
+    description: str
+    severity: Severity
+
+    model_config = ConfigDict(from_attributes=True)
+
+class SymptomUpdate(BaseModel):
+     description:  Optional[str]=None
+     severity: Optional[Severity]=None
+
+
+class SignUpdate(BaseModel):
+    description: Optional[str] = None
+    severity: Optional[Severity] = None
+
+
+
 
 
 # Register endpoint — creates a new user
@@ -201,3 +250,169 @@ def delete_patient(
     db.commit()
     
     return {"detail": f"Patient '{patient.name}' deleted successfully"}
+
+@app.post("/patients/{patient_id}/symptoms", response_model=SymptomResponse)
+def patient_symptom(
+    patient_id: int,
+    symptom: SymptomCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    new_symptom = Symptom(
+        patient_id=patient_id,
+        description=symptom.description,
+        severity=symptom.severity
+    )
+
+    db.add(new_symptom)
+    db.commit()
+    db.refresh(new_symptom)
+
+    return new_symptom
+
+@app.put("/patients/{patient_id}/symptoms/{symptom_id}", response_model=SymptomResponse)
+def update_patient_symptom(
+    patient_id: int,
+    symptom_id: int,
+    request: SymptomUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Query the patient with this id
+    symptom = db.query(Symptom).filter(Symptom.id == symptom_id, Symptom.patient_id == patient_id).first()
+    # If not found, return 404
+    if not symptom:
+     raise HTTPException(status_code=404, detail="Symptom not found")
+    # Update only the fields that were provided in the request
+    if request.description is not None:
+        symptom.description = request.description
+    if request.severity is not None:
+        symptom.severity=request.severity
+
+    # Try to commit; catch uniqueness violations
+    
+    db.commit()
+    db.refresh(symptom)
+    return symptom 
+
+@app.get("/patients/{patient_id}/symptoms", response_model=List[SymptomResponse])
+def get_patient_symptoms(
+    patient_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    symptoms = db.query(Symptom).filter(Symptom.patient_id == patient_id).all()
+    return symptoms
+
+
+@app.delete("/patients/{patient_id}/symptoms/{symptom_id}")
+def delete_patient_symptom(
+    patient_id: int,
+    symptom_id: int,
+    confirm: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    symptom = db.query(Symptom).filter(Symptom.id == symptom_id, Symptom.patient_id == patient_id).first()
+    if not symptom:
+        raise HTTPException(status_code=404, detail="Symptom not found")
+
+    if not confirm:
+        return {
+            "confirm_required": True,
+            "message": f"Delete symptom '{symptom.description}'? Call again with ?confirm=true to proceed."
+        }
+
+    db.delete(symptom)
+    db.commit()
+    return {"message": "Symptom deleted"}
+
+
+@app.post("/patients/{patient_id}/signs", response_model=SignResponse)
+def create_patient_sign(
+    patient_id: int,
+    sign: SignCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    new_sign = Sign(
+        patient_id=patient_id,
+        description=sign.description,
+        severity=sign.severity
+    )
+
+    db.add(new_sign)
+    db.commit()
+    db.refresh(new_sign)
+    return new_sign
+
+
+@app.get("/patients/{patient_id}/signs", response_model=List[SignResponse])
+def get_patient_signs(
+    patient_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    signs = db.query(Sign).filter(Sign.patient_id == patient_id).all()
+    return signs
+
+
+@app.put("/patients/{patient_id}/signs/{sign_id}", response_model=SignResponse)
+def update_patient_sign(
+    patient_id: int,
+    sign_id: int,
+    request: SignUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    sign = db.query(Sign).filter(Sign.id == sign_id, Sign.patient_id == patient_id).first()
+    if not sign:
+        raise HTTPException(status_code=404, detail="Sign not found")
+
+    if request.description is not None:
+        sign.description = request.description
+    if request.severity is not None:
+        sign.severity = request.severity
+
+    db.commit()
+    db.refresh(sign)
+    return sign
+
+
+@app.delete("/patients/{patient_id}/signs/{sign_id}")
+def delete_patient_sign(
+    patient_id: int,
+    sign_id: int,
+    confirm: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    sign = db.query(Sign).filter(Sign.id == sign_id, Sign.patient_id == patient_id).first()
+    if not sign:
+        raise HTTPException(status_code=404, detail="Sign not found")
+
+    if not confirm:
+        return {
+            "confirm_required": True,
+            "message": f"Delete sign '{sign.description}'? Call again with ?confirm=true to proceed."
+        }
+
+    db.delete(sign)
+    db.commit()
+    return {"message": "Sign deleted"}

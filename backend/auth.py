@@ -22,7 +22,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "fallbacksecretkey")
 ALGORITHM = "HS256"
 
 # How long a JWT token stays valid before expiring
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 90
 
 
 # Tells FastAPI how to extract the JWT from incoming requests:
